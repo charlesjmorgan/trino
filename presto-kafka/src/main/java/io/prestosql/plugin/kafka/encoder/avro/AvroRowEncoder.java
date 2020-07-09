@@ -11,20 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.kafka.encoder.csv;
+package io.prestosql.plugin.kafka.encoder.avro;
 
-import au.com.bytecode.opencsv.CSVWriter;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.plugin.kafka.encoder.AbstractRowEncoder;
 import io.prestosql.plugin.kafka.encoder.EncoderColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.Type;
+import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 
@@ -34,22 +36,24 @@ import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
-import static io.prestosql.spi.type.SmallintType.SMALLINT;
-import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.Varchars.isVarcharType;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
-public class CsvRowEncoder
+public class AvroRowEncoder
         extends AbstractRowEncoder
 {
     private static final Set<Type> SUPPORTED_PRIMITIVE_TYPES = ImmutableSet.of(
-            BOOLEAN, TINYINT, SMALLINT, INTEGER, BIGINT, DOUBLE, REAL);
+            BOOLEAN, INTEGER, BIGINT, DOUBLE, REAL);
 
-    public static final String NAME = "csv";
+    public static final String NAME = "avro";
 
-    private final String[] row;
+    private final ByteArrayOutputStream byteArrayOuts;
+    private final Schema parsedSchema;
+    private final DataFileWriter<GenericRecord> dataFileWriter;
+    private final GenericData.Record record;
 
-    public CsvRowEncoder(ConnectorSession session, List<EncoderColumnHandle> columnHandles)
+    public AvroRowEncoder(ConnectorSession session, List<EncoderColumnHandle> columnHandles, Schema parsedSchema)
     {
         super(session, columnHandles);
         for (EncoderColumnHandle columnHandle : this.columnHandles) {
@@ -58,7 +62,10 @@ public class CsvRowEncoder
 
             checkArgument(isSupportedType(columnHandle.getType()), "Unsupported column type '%s' for column '%s'", columnHandle.getType(), columnHandle.getName());
         }
-        this.row = new String[this.columnHandles.size()];
+        this.byteArrayOuts = new ByteArrayOutputStream();
+        this.parsedSchema = requireNonNull(parsedSchema, "parsedSchema is null");
+        this.dataFileWriter = new DataFileWriter<>(new GenericDatumWriter<>(this.parsedSchema));
+        this.record = new GenericData.Record(this.parsedSchema);
     }
 
     private boolean isSupportedType(Type type)
@@ -69,55 +76,55 @@ public class CsvRowEncoder
     @Override
     protected void appendNullValue()
     {
-        row[currentColumnIndex] = null;
+        record.put(columnHandles.get(currentColumnIndex).getName(), null);
     }
 
     @Override
     protected void appendLong(long value)
     {
-        row[currentColumnIndex] = Long.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendInt(int value)
     {
-        row[currentColumnIndex] = Integer.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendShort(short value)
     {
-        row[currentColumnIndex] = Short.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendByte(byte value)
     {
-        row[currentColumnIndex] = Byte.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendDouble(double value)
     {
-        row[currentColumnIndex] = Double.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendFloat(float value)
     {
-        row[currentColumnIndex] = Float.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendBoolean(boolean value)
     {
-        row[currentColumnIndex] = Boolean.toString(value);
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
     protected void appendString(String value)
     {
-        row[currentColumnIndex] = value;
+        record.put(columnHandles.get(currentColumnIndex).getName(), value);
     }
 
     @Override
@@ -126,17 +133,29 @@ public class CsvRowEncoder
         // make sure entire row has been updated with new values
         checkArgument(currentColumnIndex == columnHandles.size(), format("Missing %d columns", columnHandles.size() - currentColumnIndex + 1));
 
-        try (ByteArrayOutputStream byteArrayOuts = new ByteArrayOutputStream();
-                OutputStreamWriter outsWriter = new OutputStreamWriter(byteArrayOuts, StandardCharsets.UTF_8);
-                CSVWriter writer = new CSVWriter(outsWriter, ',', '"', "")) {
-            writer.writeNext(row);
-            writer.flush();
+        try {
+            byteArrayOuts.reset();
+            dataFileWriter.create(parsedSchema, byteArrayOuts);
+            dataFileWriter.append(record);
+            dataFileWriter.flush();
 
             resetColumnIndex(); // reset currentColumnIndex to prepare for next row
             return byteArrayOuts.toByteArray();
         }
         catch (IOException e) {
-            throw new UncheckedIOException(e);
+            throw new UncheckedIOException("Failed to append record", e);
+        }
+    }
+
+    @Override
+    public void close()
+    {
+        try {
+            byteArrayOuts.close();
+            dataFileWriter.close();
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException("Failed to close ByteArrayOutputStream", e);
         }
     }
 }
