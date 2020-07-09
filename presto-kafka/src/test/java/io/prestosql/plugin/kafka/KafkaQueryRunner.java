@@ -140,6 +140,7 @@ public final class KafkaQueryRunner
 
             List<String> tableNames = new ArrayList<>(4);
             tableNames.add("all_datatypes_csv");
+            tableNames.add("all_datatypes_json");
 
             JsonCodec<KafkaTopicDescription> topicDescriptionJsonCodec = new CodecSupplier<>(KafkaTopicDescription.class, queryRunner.getMetadata()).get();
 
