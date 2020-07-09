@@ -145,6 +145,10 @@ public class TestKafkaIntegrationSmokeTest
                         "all_datatypes_csv",
                         ImmutableList.of("f_bigint", "f_int", "f_smallint", "f_tinyint", "f_double", "f_boolean", "f_varchar"),
                         ImmutableList.of(100000, 1000, 100, 10, 1000.001, true, "'test'")))
+                .add(new RoundTripTestCase(
+                        "all_datatypes_raw",
+                        ImmutableList.of("f_varchar", "f_bigint", "f_int", "f_smallint", "f_tinyint", "f_double", "f_boolean"),
+                        ImmutableList.of("'test'", 100000, 1000, 100, 10, 1000.001, true)))
                 .build();
     }
 
