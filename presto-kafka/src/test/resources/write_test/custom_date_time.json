@@ -1,0 +1,60 @@
+{
+    "tableName": "custom_date_time",
+    "schemaName": "write_test",
+    "topicName": "custom_date_time",
+    "key": {
+        "dataFormat": "json",
+        "fields": [
+            {
+                "name": "kafka_key",
+                "type": "BIGINT",
+                "mapping": "kafka_key"
+            }
+        ]
+    },
+    "message": {
+        "dataFormat": "json",
+        "fields": [
+            {
+                "name": "f_bigint",
+                "type": "BIGINT",
+                "mapping": "f_bigint"
+            },
+            {
+                "name": "f_time",
+                "type": "TIME",
+                "mapping": "f_time",
+                "formatHint": "kk mm ss SSS",
+                "dataFormat": "custom-date-time"
+            },
+            {
+                "name": "f_time_with_time_zone",
+                "type": "TIME WITH TIME ZONE",
+                "mapping": "f_time_with_time_zone",
+                "formatHint": "kk mm ss SSS Z",
+                "dataFormat": "custom-date-time"
+            },
+            {
+                "name": "f_timestamp",
+                "type": "TIMESTAMP",
+                "mapping": "f_timestamp",
+                "formatHint": "yyyy dd MM kk mm ss SSS",
+                "dataFormat": "custom-date-time"
+            },
+            {
+                "name": "f_timestamp_with_time_zone",
+                "type": "TIMESTAMP WITH TIME ZONE",
+                "mapping": "f_timestamp_with_time_zone",
+                "formatHint": "yyyy dd MM kk mm ss SSS Z",
+                "dataFormat": "custom-date-time"
+            },
+            {
+                "name": "f_date",
+                "type": "DATE",
+                "mapping": "f_date",
+                "formatHint": "yyyy dd MM",
+                "dataFormat": "custom-date-time"
+            }
+        ]
+    }
+}

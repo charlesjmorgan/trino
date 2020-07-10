@@ -18,6 +18,12 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.plugin.kafka.util.TestingKafka;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.SqlDate;
+import io.prestosql.spi.type.SqlTime;
+import io.prestosql.spi.type.SqlTimeWithTimeZone;
+import io.prestosql.spi.type.SqlTimestamp;
+import io.prestosql.spi.type.SqlTimestampWithTimeZone;
+import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.Type;
 import io.prestosql.testing.AbstractTestIntegrationSmokeTest;
 import io.prestosql.testing.QueryRunner;
@@ -30,6 +36,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -149,7 +157,17 @@ public class TestKafkaIntegrationSmokeTest
                         "all_datatypes_json",
                         ImmutableList.of("f_bigint", "f_int", "f_smallint", "f_tinyint", "f_double", "f_boolean", "f_varchar"),
                         ImmutableList.of(100000, 1000, 100, 10, 1000.001, true, "'test'")))
+                .add(new RoundTripTestCase(
+                        "custom_date_time",
+                        ImmutableList.of("f_bigint", "f_time", "f_timestamp", "f_date"),
+                        ImmutableList.of(1,
+                                "TIME '01:02:03.456'",
+                                "TIMESTAMP '2020-06-10 15:55:23'",
+                                "DATE '2001-08-22'")
+                ))
                 .build();
+        // "f_time_with_time_zone" - "TIME '01:02:03.456'"
+        // "f_timestamp_with_time_zone" - "TIMESTAMP '2020-06-10 15:55:23 UTC'"
     }
 
     protected static final class RoundTripTestCase

@@ -226,7 +226,7 @@ public class JsonRowEncoder
         switch (columnHandle.getDataFormat()) {
             case "custom-date-time":
                 return this.getCustomFormatter(columnHandle.getFormatHint())
-                        .print(org.joda.time.Instant.ofEpochMilli(value.getDays()).toDateTime());
+                        .print(org.joda.time.Instant.ofEpochMilli(DAYS.toMillis(value.getDays())).toDateTime());
             case "rfc2822":
                 return Instant.ofEpochMilli(DAYS.toMillis(value.getDays()))
                         .atZone(UTC)
@@ -295,25 +295,49 @@ public class JsonRowEncoder
 
     private String formatDateTime(EncoderColumnHandle columnHandle, SqlTimestamp value)
     {
-        switch (columnHandle.getDataFormat()) {
-            case "custom-date-time":
-                return this.getCustomFormatter(columnHandle.getFormatHint())
-                        .print(org.joda.time.Instant.ofEpochMilli(value.getMillis()).toDateTime());
-            case "rfc2822":
-                return Instant.ofEpochMilli(value.getMillis())
-                        .atZone(UTC)
-                        .format(RFC_FORMATTER);
-            case "iso8601":
-                return Instant.ofEpochMilli(value.getMillis())
-                        .atZone(UTC)
-                        .toLocalDateTime()
-                        .format(ISO_DATE_TIME);
-            case "milliseconds-since-epoch":
-                return String.valueOf(value.getMillis());
-            case "seconds-since-epoch":
-                return String.valueOf(MILLISECONDS.toSeconds(value.getMillis()));
-            default:
-                throw new PrestoException(GENERIC_USER_ERROR, format("invalid data format '%s' defined for column '%s'", columnHandle.getDataFormat(), columnHandle.getName()));
+        if (!value.isLegacyTimestamp()) {
+            switch (columnHandle.getDataFormat()) {
+                case "custom-date-time":
+                    return this.getCustomFormatter(columnHandle.getFormatHint())
+                            .print(org.joda.time.Instant.ofEpochMilli(value.getMillis()).toDateTime());
+                case "rfc2822":
+                    return Instant.ofEpochMilli(value.getMillis())
+                            .atZone(UTC)
+                            .format(RFC_FORMATTER);
+                case "iso8601":
+                    return Instant.ofEpochMilli(value.getMillis())
+                            .atZone(UTC)
+                            .toLocalDateTime()
+                            .format(ISO_DATE_TIME);
+                case "milliseconds-since-epoch":
+                    return String.valueOf(value.getMillis());
+                case "seconds-since-epoch":
+                    return String.valueOf(MILLISECONDS.toSeconds(value.getMillis()));
+                default:
+                    throw new PrestoException(GENERIC_USER_ERROR, format("invalid data format '%s' defined for column '%s'", columnHandle.getDataFormat(), columnHandle.getName()));
+            }
+        }
+        else {
+            switch (columnHandle.getDataFormat()) {
+                case "custom-date-time":
+                    return this.getCustomFormatter(columnHandle.getFormatHint())
+                            .print(org.joda.time.Instant.ofEpochMilli(value.getMillisUtc()).toDateTime());
+                case "rfc2822":
+                    return Instant.ofEpochMilli(value.getMillisUtc())
+                            .atZone(UTC)
+                            .format(RFC_FORMATTER);
+                case "iso8601":
+                    return Instant.ofEpochMilli(value.getMillisUtc())
+                            .atZone(UTC)
+                            .toLocalDateTime()
+                            .format(ISO_DATE_TIME);
+                case "milliseconds-since-epoch":
+                    return String.valueOf(value.getMillisUtc());
+                case "seconds-since-epoch":
+                    return String.valueOf(MILLISECONDS.toSeconds(value.getMillisUtc()));
+                default:
+                    throw new PrestoException(GENERIC_USER_ERROR, format("invalid data format '%s' defined for column '%s'", columnHandle.getDataFormat(), columnHandle.getName()));
+            }
         }
     }
 

@@ -141,6 +141,11 @@ public final class KafkaQueryRunner
             List<String> tableNames = new ArrayList<>(4);
             tableNames.add("all_datatypes_csv");
             tableNames.add("all_datatypes_json");
+            tableNames.add("custom_date_time");
+            tableNames.add("iso8601");
+            tableNames.add("milliseconds_since_epoch");
+            tableNames.add("rfc2822");
+            tableNames.add("seconds_since_epoch");
 
             JsonCodec<KafkaTopicDescription> topicDescriptionJsonCodec = new CodecSupplier<>(KafkaTopicDescription.class, queryRunner.getMetadata()).get();
 
