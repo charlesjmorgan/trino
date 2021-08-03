@@ -1582,29 +1582,29 @@ public abstract class BaseIcebergConnectorTest
     }
 
     @Test
-    public void testPredicatePushdown()
+    public void testApplyFilter()
     {
-        QualifiedObjectName tableName = new QualifiedObjectName("iceberg", "tpch", "test_predicate");
+        QualifiedObjectName tableName = new QualifiedObjectName("iceberg", "tpch", "test_apply_filter");
         assertUpdate(format("CREATE TABLE %s (col1 BIGINT, col2 BIGINT, col3 BIGINT) WITH (partitioning = ARRAY['col2', 'col3'])", tableName));
         assertUpdate(format("INSERT INTO %s VALUES (1, 10, 100)", tableName), 1L);
         assertUpdate(format("INSERT INTO %s VALUES (2, 20, 200)", tableName), 1L);
 
         assertQuery(format("SELECT * FROM %s WHERE col1 = 1", tableName), "VALUES (1, 10, 100)");
-        assertFilterPushdown(
+        assertCorrectFilterResult(
                 tableName,
                 ImmutableMap.of("col1", singleValue(BIGINT, 1L)),
                 ImmutableMap.of(),
                 ImmutableMap.of("col1", singleValue(BIGINT, 1L)));
 
         assertQuery(format("SELECT * FROM %s WHERE col2 = 10", tableName), "VALUES (1, 10, 100)");
-        assertFilterPushdown(
+        assertCorrectFilterResult(
                 tableName,
                 ImmutableMap.of("col2", singleValue(BIGINT, 10L)),
                 ImmutableMap.of("col2", singleValue(BIGINT, 10L)),
                 ImmutableMap.of());
 
         assertQuery(format("SELECT * FROM %s WHERE col1 = 1 AND col2 = 10", tableName), "VALUES (1, 10, 100)");
-        assertFilterPushdown(
+        assertCorrectFilterResult(
                 tableName,
                 ImmutableMap.of("col1", singleValue(BIGINT, 1L), "col2", singleValue(BIGINT, 10L)),
                 ImmutableMap.of("col2", singleValue(BIGINT, 10L)),
@@ -1621,7 +1621,7 @@ public abstract class BaseIcebergConnectorTest
                 format("SELECT * FROM %s WHERE %s AND %s", tableName, format(inPredicate, "col1"), format(inPredicate, "col2")),
                 "VALUES (1, 10, 100)");
 
-        assertFilterPushdown(
+        assertCorrectFilterResult(
                 tableName,
                 ImmutableMap.of("col1", multipleValues(BIGINT, values), "col2", multipleValues(BIGINT, values)),
                 ImmutableMap.of("col2", multipleValues(BIGINT, values)),
@@ -1631,7 +1631,7 @@ public abstract class BaseIcebergConnectorTest
         dropTable(tableName.getObjectName());
     }
 
-    private void assertFilterPushdown(
+    private void assertCorrectFilterResult(
             QualifiedObjectName tableName,
             Map<String, Domain> filter,
             Map<String, Domain> expectedEnforcedPredicate,
