@@ -1582,6 +1582,214 @@ public abstract class BaseIcebergConnectorTest
     }
 
     @Test
+    public void testIntegerTypesPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_bigint_predicate_pushdown (col_1 INTEGER, col_2 BIGINT) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_bigint_predicate_pushdown VALUES " +
+                        "(1, -100), " +
+                        "(2, -10), " +
+                        "(3, -1), " +
+                        "(4, 1), " +
+                        "(5, 10), " +
+                        "(6, 100)", 6);
+
+        String selectStart = "SELECT col_1 FROM iceberg.tpch.test_bigint_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = 1")).matches("VALUES 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != 1")).matches("VALUES 1, 2, 3, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 > 0")).matches("VALUES 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 >= -1")).matches("VALUES 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 < 0")).matches("VALUES 1, 2, 3").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 <= 1")).matches("VALUES 1, 2, 3, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (-1, 10, -100)")).matches("VALUES 1, 3, 5").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 BETWEEN -64 AND 13")).matches("VALUES 2, 3, 4, 5").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_bigint_predicate_pushdown");
+
+        assertUpdate("CREATE TABLE iceberg.tpch.test_integer_predicate_pushdown (col_1 INTEGER, col_2 INTEGER) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_integer_predicate_pushdown VALUES " +
+                        "(1, -100), " +
+                        "(2, -10), " +
+                        "(3, -1), " +
+                        "(4, 1), " +
+                        "(5, 10), " +
+                        "(6, 100)", 6);
+
+        selectStart = "SELECT col_1 FROM iceberg.tpch.test_integer_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = 1")).matches("VALUES 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != 1")).matches("VALUES 1, 2, 3, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 > 0")).matches("VALUES 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 >= -1")).matches("VALUES 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 < 0")).matches("VALUES 1, 2, 3").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 <= 1")).matches("VALUES 1, 2, 3, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (-1, 10, -100)")).matches("VALUES 1, 3, 5").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 BETWEEN -64 AND 13")).matches("VALUES 2, 3, 4, 5").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_integer_predicate_pushdown");
+    }
+
+    @Test
+    public void testDecimalPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_decimal_predicate_pushdown (col_1 INTEGER, col_2 DECIMAL(10, 2)) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_decimal_predicate_pushdown VALUES " +
+                        "(1, -100.11), " +
+                        "(2, -10.11), " +
+                        "(3, -1.11), " +
+                        "(4, 1.11), " +
+                        "(5, 10.11), " +
+                        "(6, 100.11)", 6);
+
+        String selectStart = "SELECT col_1 FROM iceberg.tpch.test_decimal_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = 1.11")).matches("VALUES 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != 1.11")).matches("VALUES 1, 2, 3, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 > 0")).matches("VALUES 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 >= -1.11")).matches("VALUES 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 < 0")).matches("VALUES 1, 2, 3").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 <= 1.11")).matches("VALUES 1, 2, 3, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (-1.11, 10.11, -100.11)")).matches("VALUES 1, 3, 5").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 BETWEEN -64 AND 13")).matches("VALUES 2, 3, 4, 5").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_decimal_predicate_pushdown");
+
+        assertUpdate("CREATE TABLE iceberg.tpch.test_decimal_predicate_pushdown (col_1 INTEGER, col_2 DECIMAL(10, 2)) WITH (partitioning = ARRAY['truncate(col_2, 2)'])");
+    }
+
+    @Test
+    public void testFloatingPointTypesPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_real_predicate_pushdown (col_1 INTEGER, col_2 REAL) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_real_predicate_pushdown VALUES " +
+                        "(1, -100.11), " +
+                        "(2, -10.11), " +
+                        "(3, -1.11), " +
+                        "(4, 1.11), " +
+                        "(5, 10.11), " +
+                        "(6, 100.11)", 6);
+
+        String selectStart = "SELECT col_1 FROM iceberg.tpch.test_real_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = 1.11")).matches("VALUES 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 > 0")).matches("VALUES 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 >= -1.11")).matches("VALUES 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 < 0")).matches("VALUES 1, 2, 3").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 <= 1.11")).matches("VALUES 1, 2, 3, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (-1.11, 10.11, -100.11)")).matches("VALUES 1, 3, 5").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 BETWEEN -64 AND 13")).matches("VALUES 2, 3, 4, 5").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_real_predicate_pushdown");
+
+        assertUpdate("CREATE TABLE iceberg.tpch.test_double_predicate_pushdown (col_1 INTEGER, col_2 DOUBLE) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_double_predicate_pushdown VALUES " +
+                        "(1, -100.11), " +
+                        "(2, -10.11), " +
+                        "(3, -1.11), " +
+                        "(4, 1.11), " +
+                        "(5, 10.11), " +
+                        "(6, 100.11)", 6);
+
+        selectStart = "SELECT col_1 FROM iceberg.tpch.test_double_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = 1.11")).matches("VALUES 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 > 0")).matches("VALUES 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 >= -1.11")).matches("VALUES 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 < 0")).matches("VALUES 1, 2, 3").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 <= 1.11")).matches("VALUES 1, 2, 3, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (-1.11, 10.11, -100.11)")).matches("VALUES 1, 3, 5").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 BETWEEN -64 AND 13")).matches("VALUES 2, 3, 4, 5").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_double_predicate_pushdown");
+    }
+
+    @Test
+    public void testBooleanPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_boolean_predicate_pushdown (col_1 INTEGER, col_2 BOOLEAN) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_boolean_predicate_pushdown VALUES " +
+                        "(1, TRUE), " +
+                        "(2, FALSE)", 2);
+
+        String selectStart = "SELECT col_1 FROM iceberg.tpch.test_boolean_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = TRUE")).matches("VALUES 1").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 = FALSE")).matches("VALUES 2").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != FALSE")).matches("VALUES 1").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != TRUE")).matches("VALUES 2").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 = TRUE OR col_2 = FALSE")).matches("VALUES 1, 2").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (FALSE)")).matches("VALUES 2").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 NOT IN (FALSE)")).matches("VALUES 1").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_boolean_predicate_pushdown");
+    }
+
+    @Test
+    public void testVarcharPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_varchar_predicate_pushdown (col_1 INTEGER, col_2 VARCHAR) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_varchar_predicate_pushdown VALUES " +
+                        "(1, 'abcdef'), " +
+                        "(2, 'zipper'), " +
+                        "(3, 'racecar'), " +
+                        "(4, 'cm1234'), " +
+                        "(5, 'trinodb'), " +
+                        "(6, 'random')", 6);
+
+        String selectStart = "SELECT col_1 FROM iceberg.tpch.test_varchar_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = 'abcdef'")).matches("VALUES 1").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != 'abcdef'")).matches("VALUES 2, 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN ('abcdef', 'zipper', 'cm1234')")).matches("VALUES 1, 2, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 NOT IN ('abcdef', 'zipper', 'cm1234')")).matches("VALUES 3, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 BETWEEN 'abcdef' AND 'racecar'")).matches("VALUES 1, 3, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 NOT BETWEEN 'abcdef' AND 'racecar'")).matches("VALUES 2, 5, 6").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_varchar_predicate_pushdown");
+    }
+
+    @Test
+    public void testVarbinaryPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_varbinary_predicate_pushdown (col_1 INTEGER, col_2 VARBINARY) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_varbinary_predicate_pushdown VALUES " +
+                        "(1, X'7A31'), " +  // z1
+                        "(2, X'6162'), " +  // ab
+                        "(3, X'6364'), " +  // cd
+                        "(4, X'3233'), " +  // 12
+                        "(5, X'3562'), " +  // 5b
+                        "(6, X'6D73')", 6);  // ms
+
+        String selectStart = "SELECT col_1 FROM iceberg.tpch.test_varbinary_predicate_pushdown ";
+        assertThat(query(selectStart + "WHERE col_2 = X'7A31'")).matches("VALUES 1").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 != X'7A31'")).matches("VALUES 2, 3, 4, 5, 6").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 IN (X'7A31', X'6162', X'3233')")).matches("VALUES 1, 2, 4").isFullyPushedDown();
+        assertThat(query(selectStart + "WHERE col_2 NOT IN (X'7A31', X'6162', X'3233')")).matches("VALUES 3, 5, 6").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_varbinary_predicate_pushdown");
+    }
+
+    @Test
+    public void testNullPredicatePushdown()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_null_predicate_pushdown (col_1 INTEGER, col_2 INTEGER) WITH (partitioning = ARRAY['col_2'])");
+        assertUpdate(
+                "INSERT INTO iceberg.tpch.test_null_predicate_pushdown VALUES " +
+                        "(1, -100), " +
+                        "(2, -10), " +
+                        "(3, -1), " +
+                        "(4, 1), " +
+                        "(5, NULL), " +
+                        "(6, 100)", 6);
+
+        assertThat(query("SELECT col_1 FROM iceberg.tpch.test_null_predicate_pushdown WHERE col_2 IS NULL")).matches("VALUES 5").isFullyPushedDown();
+        assertThat(query("SELECT col_1 FROM iceberg.tpch.test_null_predicate_pushdown WHERE col_2 IS NOT NULL")).matches("VALUES 1, 2, 3, 4, 6").isFullyPushedDown();
+
+        dropTable("iceberg.tpch.test_null_predicate_pushdown");
+    }
+
+    @Test
     public void testApplyFilter()
     {
         QualifiedObjectName tableName = new QualifiedObjectName("iceberg", "tpch", "test_apply_filter");
