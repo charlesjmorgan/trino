@@ -1758,6 +1758,40 @@ public abstract class BaseIcebergConnectorTest
     }
 
     @Test
+    public void testPartitionValuesWithSpecialCharacters()
+    {
+        assertUpdate("CREATE TABLE iceberg.tpch.test_special_characters (col_1 INTEGER, col_2 VARCHAR) WITH (partitioning = ARRAY['col_2'])");
+        String values = "" +
+                "(1, 'abcd ef'), " +
+                "(2, 'zip per'), " +
+                "(3, 'race car'), " +
+                "(4, 'with:colon'), " +
+                "(5, 'with-hyphen'), " +
+                "(6, 'with?question'), " +
+                "(7, ' startof'), " +
+                "(8, 'endof '), " +
+                "(9, 'with👨‍🏭factoryman'), " +
+                "(10, ' 👨‍🏭'), " +
+                "(11, '👨‍🏭 '), " +
+                "(12, 'with!exclamation'), " +
+                "(13, 'with.dot'), " +
+                "(14, 'with/slash'), " +
+                "(15, 'with%percent'), " +
+                "(16, 'with$dollar'), " +
+                "(17, 'with#pound'), " +
+                "(18, 'with@at'), " +
+                "(19, 'with*star'), " +
+                "(20, 'with&amp'), " +
+                "(21, 'with=equals'), " +
+                "(22, 'with\\backslash')," +
+                "(23, 'with€euro')";
+        assertUpdate("INSERT INTO iceberg.tpch.test_special_characters VALUES " + values, 23);
+        assertQuery("SELECT col_1, col_2 FROM iceberg.tpch.test_special_characters", "VALUES " + values);
+        assertQuery("SELECT col_1, col_2 FROM iceberg.tpch.test_special_characters WHERE col_2 = 'with👨‍🏭factoryman'", "VALUES (9, 'with👨‍🏭factoryman')");
+        dropTable("iceberg.tpch.test_special_characters");
+    }
+
+    @Test
     public void testCreateNestedPartitionedTable()
     {
         assertUpdate("CREATE TABLE test_nested_table_1 (" +

@@ -423,6 +423,51 @@ public class TestIcebergSparkCompatibility
         onTrino().executeQuery("DROP TABLE " + trinoTableName(trinoTable));
     }
 
+    @Test(groups = {ICEBERG, PROFILE_SPECIFIC_TESTS})
+    public void testPartitionValuesWithSpecialCharactersFromSparkToTrino()
+    {
+        String baseTableName = "test_special_characters_in_partition_values";
+        String trinoTableName = trinoTableName(baseTableName);
+        String sparkTableName = sparkTableName(baseTableName);
+
+        onSpark().executeQuery(format(
+                "CREATE TABLE %s " +
+                        "(col_1 INTEGER, partition_col STRING) " +
+                        "USING ICEBERG " +
+                        "PARTITIONED BY (partition_col)",
+                sparkTableName));
+
+        onSpark().executeQuery(format("INSERT INTO %s VALUES (1, 'foo bar')", sparkTableName));
+
+        QueryResult trinoSelect = onTrino().executeQuery(format("SELECT col_1, partition_col FROM %s", trinoTableName));
+        Row expectedRow = row(1, "foo bar");
+        assertThat(trinoSelect).containsOnly(expectedRow);
+
+        onSpark().executeQuery(format("DROP TABLE %s", sparkTableName));
+    }
+
+    @Test(groups = {ICEBERG, PROFILE_SPECIFIC_TESTS})
+    public void testPartitionValuesWithSpecialCharactersFromTrinoToSpark()
+    {
+        String baseTableName = "test_special_characters_in_partition_values";
+        String trinoTableName = trinoTableName(baseTableName);
+        String sparkTableName = sparkTableName(baseTableName);
+
+        onTrino().executeQuery(format(
+                "CREATE TABLE %s " +
+                        "(col_1 INTEGER, partition_col VARCHAR) " +
+                        "WITH (partitioning = ARRAY['partition_col'])",
+                trinoTableName));
+
+        onTrino().executeQuery(format("INSERT INTO %s VALUES (1, 'foo bar')", trinoTableName));
+
+        QueryResult sparkSelect = onSpark().executeQuery(format("SELECT col_1, partition_col FROM %s", sparkTableName));
+        Row expectedRow = row(1, "foo bar");
+        assertThat(sparkSelect).containsOnly(expectedRow);
+
+        onTrino().executeQuery(format("DROP TABLE %s", trinoTableName));
+    }
+
     private static String sparkTableName(String tableName)
     {
         return format("%s.%s.%s", SPARK_CATALOG, TEST_SCHEMA_NAME, tableName);
