@@ -380,6 +380,41 @@ public class TestHiveConnectorTest
     }
 
     @Test
+    public void testSpacesInPartitionValues()
+    {
+        testWithAllStorageFormats(this::testSpacesInPartitionValues);
+    }
+
+    private void testSpacesInPartitionValues(Session session, HiveStorageFormat storageFormat)
+    {
+        assertUpdate(session, "CREATE TABLE test_spaces_in_partitions (col_1 INTEGER, partition_col VARCHAR) WITH (format = '" + storageFormat + "', partitioned_by = ARRAY['partition_col'])");
+        String values = "" +
+                "(1, 'abcd ef'), " +
+                "(2, 'zip per'), " +
+                "(3, 'race car'), " +
+                "(4, 'with:colon'), " +
+                "(5, 'with-hyphen'), " +
+                "(6, 'with?question'), " +
+                "(7, ' startof'), " +
+                "(8, 'endof '), " +
+                "(9, 'with!exclamation'), " +
+                "(10, 'with.dot'), " +
+                "(11, 'with/slash'), " +
+                "(12, 'with%percent'), " +
+                "(13, 'with$dollar'), " +
+                "(14, 'with#pound'), " +
+                "(15, 'with@at'), " +
+                "(16, 'with*star'), " +
+                "(17, 'with&amp'), " +
+                "(18, 'with=equals'), " +
+                "(19, 'with\\backslash')";
+        assertUpdate(session, "INSERT INTO test_spaces_in_partitions VALUES " + values, 19);
+        assertQuery(session, "SELECT col_1, partition_col FROM test_spaces_in_partitions", "VALUES " + values);
+        assertQuery(session, "SELECT col_1, partition_col FROM test_spaces_in_partitions WHERE partition_col = 'with-hyphen'", "VALUES (5, 'with-hyphen')");
+        assertUpdate(session, "DROP TABLE test_spaces_in_partitions");
+    }
+
+    @Test
     public void testIsNotNullWithNestedData()
     {
         Session admin = Session.builder(getSession())

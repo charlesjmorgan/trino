@@ -97,4 +97,50 @@ public class TestSparkCompatibility
 
         onSpark().executeQuery("DROP TABLE " + baseTableName);
     }
+
+    @Test(groups = {HIVE_SPARK_BUCKETING, PROFILE_SPECIFIC_TESTS})
+    public void testPartitionValuesWithSpecialCharactersFromSparkToTrino()
+    {
+        String baseTableName = "test_special_characters_in_partition_values_" + randomTableSuffix();
+        String trinoTableName = trinoTableName(baseTableName);
+
+        onSpark().executeQuery(format(
+                "CREATE TABLE %s " +
+                        "(col_1 INTEGER, partition_col STRING) " +
+                        "USING ORC " +
+                        "PARTITIONED BY (partition_col) " +
+                        "TBLPROPERTIES ('transactional'='false')", baseTableName));
+
+        onSpark().executeQuery(format("INSERT INTO %s PARTITION (partition_col = 'foo bar') VALUES 1", baseTableName));
+
+        QueryResult trinoSelect = onTrino().executeQuery(format("SELECT * FROM %s", trinoTableName));
+        Row expectedRow = row(1, "foo bar");
+        assertThat(trinoSelect).containsOnly(expectedRow);
+
+        onSpark().executeQuery(format("DROP TABLE %s", baseTableName));
+    }
+
+    @Test(groups = {HIVE_SPARK_BUCKETING, PROFILE_SPECIFIC_TESTS})
+    public void testPartitionValuesWithSpecialCharactersFromTrinoToSpark()
+    {
+        String baseTableName = "test_special_characters_in_partition_values_" + randomTableSuffix();
+        String trinoTableName = trinoTableName(baseTableName);
+
+        onTrino().executeQuery(format("CREATE TABLE %s " +
+                "(col_1 INTEGER, partition_col VARCHAR) " +
+                "WITH (format = 'ORC', partitioned_by = ARRAY['partition_col'])", trinoTableName));
+
+        onTrino().executeQuery(format("INSERT INTO %s VALUES (1, 'foo bar')", trinoTableName));
+
+        QueryResult sparkSelect = onSpark().executeQuery(format("SELECT col_1, partition_col FROM %s", baseTableName));
+        Row expectedRow = row(1, "foo bar");
+        assertThat(sparkSelect).containsOnly(expectedRow);
+
+        onSpark().executeQuery(format("DROP TABLE %s", baseTableName));
+    }
+
+    private String trinoTableName(String baseTableName)
+    {
+        return format("%s.default.%s", TRINO_CATALOG, baseTableName);
+    }
 }
