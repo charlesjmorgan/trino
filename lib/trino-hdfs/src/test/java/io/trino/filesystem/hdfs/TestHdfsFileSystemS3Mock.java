@@ -16,6 +16,7 @@ package io.trino.filesystem.hdfs;
 import com.adobe.testing.s3mock.testcontainers.S3MockContainer;
 import io.airlift.units.DataSize;
 import io.trino.filesystem.AbstractTestTrinoFileSystem;
+import io.trino.filesystem.AbstractTrinoFileSystemTestingEnvironment;
 import io.trino.filesystem.Location;
 import io.trino.filesystem.TrinoFileSystem;
 import io.trino.hdfs.ConfigurationInitializer;
@@ -33,6 +34,7 @@ import io.trino.spi.security.ConnectorIdentity;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.junit.jupiter.Container;
@@ -45,103 +47,134 @@ import java.util.Set;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
 public class TestHdfsFileSystemS3Mock
         extends AbstractTestTrinoFileSystem
 {
-    private static final String BUCKET = "test-bucket";
-
-    @Container
-    private static final S3MockContainer S3_MOCK = new S3MockContainer("3.0.1")
-            .withInitialBuckets(BUCKET);
-
-    private HdfsEnvironment hdfsEnvironment;
-    private HdfsContext hdfsContext;
-    private TrinoFileSystem fileSystem;
+    private HadoopFileSystemTestingEnvironmentS3Mock testingEnvironment;
 
     @BeforeAll
     void beforeAll()
     {
-        HiveS3Config s3Config = new HiveS3Config()
-                .setS3AwsAccessKey("accesskey")
-                .setS3AwsSecretKey("secretkey")
-                .setS3Endpoint(S3_MOCK.getHttpEndpoint())
-                .setS3PathStyleAccess(true)
-                .setS3StreamingPartSize(DataSize.valueOf("5.5MB"));
+        testingEnvironment = new HadoopFileSystemTestingEnvironmentS3Mock();
+    }
 
-        HdfsConfig hdfsConfig = new HdfsConfig();
-        ConfigurationInitializer s3Initializer = new TrinoS3ConfigurationInitializer(s3Config);
-        HdfsConfigurationInitializer initializer = new HdfsConfigurationInitializer(hdfsConfig, Set.of(s3Initializer));
-        HdfsConfiguration hdfsConfiguration = new DynamicHdfsConfiguration(initializer, emptySet());
-        hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, hdfsConfig, new NoHdfsAuthentication());
-        hdfsContext = new HdfsContext(ConnectorIdentity.ofUser("test"));
-
-        fileSystem = new HdfsFileSystem(hdfsEnvironment, hdfsContext, new TrinoHdfsFileSystemStats());
+    @AfterAll
+    void afterAll()
+    {
+        if (testingEnvironment != null) {
+            testingEnvironment = null;
+        }
     }
 
     @AfterEach
     void afterEach()
             throws IOException
     {
-        Path root = new Path(getRootLocation().toString());
-        FileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, root);
-        for (FileStatus status : fs.listStatus(root)) {
-            fs.delete(status.getPath(), true);
+        testingEnvironment.cleanupFiles();
+    }
+
+    @Override
+    protected AbstractTrinoFileSystemTestingEnvironment testingEnvironment()
+    {
+        return testingEnvironment;
+    }
+
+    @Testcontainers
+    public static class HadoopFileSystemTestingEnvironmentS3Mock
+            extends AbstractTrinoFileSystemTestingEnvironment
+    {
+        private static final String BUCKET = "test-bucket";
+
+        @Container
+        private static final S3MockContainer S3_MOCK = new S3MockContainer("3.0.1")
+                .withInitialBuckets(BUCKET);
+
+        private final HdfsEnvironment hdfsEnvironment;
+        private final HdfsContext hdfsContext;
+        private final TrinoFileSystem fileSystem;
+
+        public HadoopFileSystemTestingEnvironmentS3Mock()
+        {
+            HiveS3Config s3Config = new HiveS3Config()
+                    .setS3AwsAccessKey("accesskey")
+                    .setS3AwsSecretKey("secretkey")
+                    .setS3Endpoint(S3_MOCK.getHttpEndpoint())
+                    .setS3PathStyleAccess(true)
+                    .setS3StreamingPartSize(DataSize.valueOf("5.5MB"));
+
+            HdfsConfig hdfsConfig = new HdfsConfig();
+            ConfigurationInitializer s3Initializer = new TrinoS3ConfigurationInitializer(s3Config);
+            HdfsConfigurationInitializer initializer = new HdfsConfigurationInitializer(hdfsConfig, Set.of(s3Initializer));
+            HdfsConfiguration hdfsConfiguration = new DynamicHdfsConfiguration(initializer, emptySet());
+            hdfsEnvironment = new HdfsEnvironment(hdfsConfiguration, hdfsConfig, new NoHdfsAuthentication());
+            hdfsContext = new HdfsContext(ConnectorIdentity.ofUser("test"));
+
+            fileSystem = new HdfsFileSystem(hdfsEnvironment, hdfsContext, new TrinoHdfsFileSystemStats());
         }
-    }
 
-    @Override
-    protected final boolean isHierarchical()
-    {
-        return false;
-    }
-
-    @Override
-    protected TrinoFileSystem getFileSystem()
-    {
-        return fileSystem;
-    }
-
-    @Override
-    protected Location getRootLocation()
-    {
-        return Location.of("s3://%s/".formatted(BUCKET));
-    }
-
-    @Override
-    protected final boolean supportsCreateWithoutOverwrite()
-    {
-        return false;
-    }
-
-    @Override
-    protected final boolean deleteFileFailsIfNotExists()
-    {
-        return false;
-    }
-
-    @Override
-    protected boolean normalizesListFilesResult()
-    {
-        return true;
-    }
-
-    @Override
-    protected boolean seekPastEndOfFileFails()
-    {
-        return false;
-    }
-
-    @Override
-    protected void verifyFileSystemIsEmpty()
-    {
-        try {
+        public void cleanupFiles()
+                throws IOException
+        {
             Path root = new Path(getRootLocation().toString());
             FileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, root);
-            assertThat(fs.listStatus(root)).isEmpty();
+            for (FileStatus status : fs.listStatus(root)) {
+                fs.delete(status.getPath(), true);
+            }
         }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
+
+        @Override
+        protected final boolean isHierarchical()
+        {
+            return false;
+        }
+
+        @Override
+        public TrinoFileSystem getFileSystem()
+        {
+            return fileSystem;
+        }
+
+        @Override
+        protected Location getRootLocation()
+        {
+            return Location.of("s3://%s/".formatted(BUCKET));
+        }
+
+        @Override
+        protected final boolean supportsCreateWithoutOverwrite()
+        {
+            return false;
+        }
+
+        @Override
+        protected final boolean deleteFileFailsIfNotExists()
+        {
+            return false;
+        }
+
+        @Override
+        protected boolean normalizesListFilesResult()
+        {
+            return true;
+        }
+
+        @Override
+        protected boolean seekPastEndOfFileFails()
+        {
+            return false;
+        }
+
+        @Override
+        protected void verifyFileSystemIsEmpty()
+        {
+            try {
+                Path root = new Path(getRootLocation().toString());
+                FileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, root);
+                assertThat(fs.listStatus(root)).isEmpty();
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 }
